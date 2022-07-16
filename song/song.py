@@ -59,11 +59,11 @@ def square(array_in) -> np.array: # 方波
     return np.array(result) # square
 
 def unison_saw(array_in) -> np.array:
-    sawtooth_arr  = sawtooth((array_in + np.random.rand() * 100) * 1.04) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.02) * 0.2
+    sawtooth_arr  = sawtooth((array_in + np.random.rand() * 100) * 1.06) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.03) * 0.2
     sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.00) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.98) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.96) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.97) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.94) * 0.2
     sawtooth_arr /= max(abs(sawtooth_arr))
     arr = sawtooth_arr * slide(1, 0.8, len(array_in), 2000)
     return arr # unison_saw
@@ -74,7 +74,7 @@ def lead_saw1(arr):
     return s # lead_saw1
 
 def lead_saw2(arr):
-    n = fnoise(arr * 2)
+    n = fnoise(arr * 5)
     s = unison_saw(arr + n * 3)
     return s # lead_saw2
 
@@ -85,9 +85,9 @@ def lead_pulse1(arr):
 
 def hardlead(arr):
     arr[-round(60 / bpm / 16 * rate):] *= 0
-    s = lead_saw1(arr) * 0.3 + lead_saw2(arr) * 0.5 + lead_pulse1(arr) * 0.2
+    s = lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2
     arr *= 2
-    s += lead_saw1(arr) * 0.3 + lead_saw2(arr) * 0.5 + lead_pulse1(arr) * 0.2
+    s += (lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2) * 0.8
     s = distortion(s, 0.4, 0.6)
     s = highpass(s, 300)
     s = highgain(s, 1500, 1.1)
@@ -99,7 +99,7 @@ def hardchord(arr):
     arr[-round(60 / bpm / 16 * rate):] *= 0
     s = unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25
     arr *= 2
-    s = unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25
+    s += (unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25) * 0.8
     s = distortion(s, 0.5, 0.55)
     s = highpass(s, 300)
     s = bandgain(s, 2000, 1000, 1.1)
@@ -112,7 +112,7 @@ def raw_tail(freq, duration):
     sub += build_melody(freq, duration, noise, 0.03)
     sub *= slide(0, 1, round(duration * rate), 800)
     sub = limit(sub * 1.2, 1, -1)
-    crunch = build_melody(note("C2") * 8, duration, triangle, 1) + build_melody(freq, duration, noise, 1)
+    crunch = build_melody(freq * 8, duration, triangle, 1) + build_melody(freq, duration, noise, 1)
     crunch *= slide(0, 1, round(duration * rate), 20000) * 0.6 * slide(0, 1, round(duration * rate), 1500)[::-1]
     sub += crunch
     sub = distortion(sub, 0.1, 0.95)
@@ -306,7 +306,7 @@ def bandgain(arr, freq_h, freq_l, times=5):
     arr1 = maximize(arr1)
     return arr1 # bandgain
 
-def compile_tracks(tracks, volumes, effects):
+def compile_tracks(tracks, volumes, effects, master):
     tracks_l = []
     for track in tracks:
         track_a = np.array([])
@@ -333,6 +333,7 @@ def compile_tracks(tracks, volumes, effects):
         track = track.astype(np.float16)
         song += track
 
+    song = master(song)
     if max(abs(song)) > 1:
         song = compressor(song)
 
@@ -348,7 +349,7 @@ def maximize(arr):
 
 n = maximize(np.random.random(100000)) * slide(1, 0, 100000, 80000) * slide(0, 0.6, 100000, 1200) # IR
 
-def reverb(x, dry=0.8):
+def reverb(x, dry=0.5):
     x1 = deepcopy(x)
     n[-1] = 0
     print("convolving")
@@ -408,21 +409,241 @@ def compressor(x):
 climax = compile_tracks(
     [
         [
-            build_melody(note("B4"), 60 / bpm, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A5"), 60 / bpm / 2, hardlead),
+            
+            build_melody(note("F#5"), 60 / bpm / 2, hardlead),
+            build_melody(note("F#5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("A#5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A#5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead, 0),
+            
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("F#6"), 60 / bpm / 2, hardlead),
+
+            
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A5"), 60 / bpm / 2, hardlead),
+            
+            build_melody(note("F#5"), 60 / bpm / 2, hardlead),
+            build_melody(note("F#5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("A#5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A#5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead, 0),
+            
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("D6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead),
+            build_melody(note("C#6"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
+            build_melody(note("B5"), 60 / bpm / 2, hardlead),
+            build_melody(note("A5"), 60 / bpm / 2, hardlead),
 
         ],
         [
-            build_chord([note("G3"), note("B3"), note("E3")], 60 / bpm, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            
+
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("G4"), note("B4"), note("D5")], 60 / bpm / 2, hardchord),
+            
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord),
+            build_chord([note("F#4"), note("A#4"), note("D5")], 60 / bpm / 2, hardchord, 0),
+            
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            build_chord([note("B4"), note("D5"), note("F#5")], 60 / bpm / 2, hardchord),
+            
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord, 0),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
         ],
         [
+            build_melody(0, 60 / bpm / 2, sin, 0),
+            raw_tail(note("G2"), 60 / bpm / 2),
             raw_kick2(note("C2")),
             raw_tail(note("G2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("G2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("G2"), 60 / bpm / 4 * 3),
+            
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 2),
+            raw_kick2(note("C2")),
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 2),
+            raw_kick2(note("C2")),
+
+
+            build_melody(0, 60 / bpm / 2, sin, 0),
+            raw_kick2(note("G2")),
+            raw_kick2(note("E2")),
+            raw_kick2(note("C2")),
+            raw_tail(note("G2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("G2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("G2"), 60 / bpm / 4 * 3),
+            
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("F#2"), 60 / bpm / 4 * 3),
+            
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("B2"), 60 / bpm / 4 * 3),
+
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 4 * 3),
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 2),
+            raw_kick2(note("C2")),
+            raw_kick2(note("C2")),
+            raw_tail(note("A2"), 60 / bpm / 4),
+            raw_kick2(note("C2")),
+            raw_kick2(note("C2")),
+
         ]
     ],
-    [0.35, 0.25, 0.4],
-    #[0, 0, 1],
-    [eff_chain(reverb, kickstart), eff_chain(reverb, kickstart), eff(reverb, dry=0.9)]
-    #[lambda X:X, lambda X:X, lambda X:X]
+    [0.35, 0.25, 0.4], # 精细（？）音量
+    #[0, 0, 1], # only kicks
+    [eff_chain(reverb, kickstart, maximize), eff_chain(reverb, kickstart, maximize), eff_chain(eff(reverb, dry=0.9), maximize)], # 细致（雾🌫️）混音
+    #[lambda X:X, lambda X:X, lambda X:X], # 快速预览
+    maximize # 极简母带
     )
 """
 climax = compile_tracks(
