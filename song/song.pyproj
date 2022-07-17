@@ -24,6 +24,7 @@
     <Compile Include="song.py" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="IR.wav" />
     <Content Include="song.wav" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />

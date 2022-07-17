@@ -58,12 +58,34 @@ def square(array_in) -> np.array: # 方波
             result.append(-1)
     return np.array(result) # square
 
+def pluck_sawtooth(array_in):
+    array_in /= 2
+    a = array_in * 0
+    b = array_in * 0 + 1
+    for _ in range(1, 51, 1):
+        b[round(60 / bpm * ((50 - _) ** 6) / 300000):] = 0
+        if _ > 3:
+            a += sin(array_in * _) / _ * b
+        else:
+            a += sin(array_in * _) / _
+    return maximize(a) # pluck_sawtooth
+
+def unison_saw_pluck(array_in) -> np.array:
+    sawtooth_arr  = pluck_sawtooth((array_in + np.random.rand() * 100) * 1.02) * 0.2
+    sawtooth_arr += pluck_sawtooth((array_in + np.random.rand() * 100) * 1.01) * 0.2
+    sawtooth_arr += pluck_sawtooth((array_in + np.random.rand() * 100) * 1.00) * 0.2
+    sawtooth_arr += pluck_sawtooth((array_in + np.random.rand() * 100) * 0.99) * 0.2
+    sawtooth_arr += pluck_sawtooth((array_in + np.random.rand() * 100) * 0.98) * 0.2
+    sawtooth_arr /= max(abs(sawtooth_arr))
+    arr = sawtooth_arr * slide(1, 0.8, len(array_in), 2000)
+    return arr # unison_saw_pluck
+
 def unison_saw(array_in) -> np.array:
-    sawtooth_arr  = sawtooth((array_in + np.random.rand() * 100) * 1.06) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.03) * 0.2
+    sawtooth_arr  = sawtooth((array_in + np.random.rand() * 100) * 1.04) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.02) * 0.2
     sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.00) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.97) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.94) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.98) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.96) * 0.2
     sawtooth_arr /= max(abs(sawtooth_arr))
     arr = sawtooth_arr * slide(1, 0.8, len(array_in), 2000)
     return arr # unison_saw
@@ -90,7 +112,7 @@ def hardlead(arr):
     s += (lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2) * 0.8
     s = distortion(s, 0.4, 0.6)
     s = highpass(s, 300)
-    s = highgain(s, 1500, 1.1)
+    s = highgain(s, 1500, 1.3)
     s = maximize(s)
     s *= slide(1, 0.8, len(arr), 1000)
     return s # hardlead
@@ -102,7 +124,7 @@ def hardchord(arr):
     s += (unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25) * 0.8
     s = distortion(s, 0.5, 0.55)
     s = highpass(s, 300)
-    s = bandgain(s, 2000, 1000, 1.1)
+    s = bandgain(s, 2000, 1000, 1.3)
     s = maximize(s)
     s *= slide(1, 0.8, len(arr), 1000)
     return s # hardchord
@@ -347,13 +369,14 @@ def maximize(arr):
     arr /= max(abs(arr))
     return arr # maximize
 
-n = maximize(np.random.random(100000)) * slide(1, 0, 100000, 80000) * slide(0, 0.6, 100000, 1200) # IR
+audio = audio = AudioFileClip("IR.wav")
+n = audio.to_soundarray().T[0] # IR
 
-def reverb(x, dry=0.5):
+def reverb(x, dry=0.8):
     x1 = deepcopy(x)
     n[-1] = 0
     print("convolving")
-    x = np.convolve(lowpass(x, 18000), n)[:len(x1)]
+    x = np.convolve(x, n)[:len(x1)]
     x = maximize(x)
     print("finish")
     x = x1 * dry + x * (1 - dry)
@@ -378,13 +401,13 @@ def kickstart(x):
     s += 1
     s *= 2
     s = limit(s, 1, 0)
-    s = distortion(s, 0.6, 0.4)
+    s = distortion(s, 0.8, 0.2)
     x *= s
     return x # kickstart
     
-def eff(func, **args):
+def eff(func, *args, **kwargs):
     def f(arr):
-        return func(arr, **args)
+        return func(arr, *args, **kwargs)
     return f # eff
 
 def eff_chain(*l):
@@ -395,15 +418,21 @@ def eff_chain(*l):
     return f # eff_chain
 
 def compressor(x):
+    print("compressing, max volume:{}".format(round(max(abs(x)), 2)))
     a = 1
     for i in range(len(x)):
         if abs(x[i]) > a:
-            a = abs(x[i])
+            a = abs(x[i]) * 1.1
         else:
             if a > 1:
-                a *= 0.99
-        i /= a
+                a *= 0.998
+        x[i] /= a
+    x = maximize(x)
+    print("finish")
     return x # compressor
+
+def times(x, t):
+    return x * t # times
 
 
 climax = compile_tracks(
@@ -559,7 +588,8 @@ climax = compile_tracks(
         ],
         [
             build_melody(0, 60 / bpm / 2, sin, 0),
-            raw_tail(note("G2"), 60 / bpm / 2),
+            raw_kick2(note("C2")),
+            raw_tail(note("G2"), 60 / bpm / 4),
             raw_kick2(note("C2")),
             raw_tail(note("G2"), 60 / bpm / 4 * 3),
             raw_kick2(note("C2")),
@@ -639,56 +669,95 @@ climax = compile_tracks(
 
         ]
     ],
-    [0.35, 0.25, 0.4], # 精细（？）音量
+    [0.4, 0.6, 0.4], # 精细（？）音量
     #[0, 0, 1], # only kicks
-    [eff_chain(reverb, kickstart, maximize), eff_chain(reverb, kickstart, maximize), eff_chain(eff(reverb, dry=0.9), maximize)], # 细致（雾🌫️）混音
-    #[lambda X:X, lambda X:X, lambda X:X], # 快速预览
-    maximize # 极简母带
+    [eff_chain(reverb, eff(times, 20), compressor, kickstart), eff_chain(reverb, eff(times, 20), compressor, kickstart), eff_chain(eff(reverb, dry=0.9), compressor)], # 细致（雾🌫️）混音
+    #[eff_chain(eff(times, 20), compressor, kickstart), eff_chain(eff(times, 20), compressor, kickstart), eff_chain(eff(times, 1.5), compressor)], # 快速预览
+    eff_chain(maximize, eff(times, 2.5), compressor) # 极简母带（压成砖头）
     )
 """
 climax = compile_tracks(
+[      
 [
-[
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
+            
+            build_melody(note("F#5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A#5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
+            
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#6"), 60 / bpm / 2, unison_saw_pluck),
 
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
-raw_kick2(note("C2")),
-raw_tail(note("C2"), 60 / bpm / 4 * 3),
+            
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
+            
+            build_melody(note("F#5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A#5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
+            
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#6"), 60 / bpm / 2, unison_saw_pluck),
 ]
 ],
 [1],
-[eff(reverb, dry=0.9)]
-)"""
+[lambda x:x],
+lambda X:X
+)
+"""
 song = climax
 song = (song * 32767).astype(np.int16)
 #              ^^^^^ 淦，之前写的都是1024
