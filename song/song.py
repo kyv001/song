@@ -7,6 +7,9 @@ from moviepy.editor import AudioFileClip
 rate = 44100
 channels = 1
 bpm = 150
+no_reverb = False
+if no_reverb:
+    print("Reverb is disabled.")
 
 sin = np.sin # sin
 
@@ -80,15 +83,31 @@ def unison_saw_pluck(array_in) -> np.array:
     arr = sawtooth_arr * slide(1, 0.8, len(array_in), 2000)
     return arr # unison_saw_pluck
 
+def lp_saw(array_in):
+    a = array_in * 0
+    for _ in range(1, 31, 1):
+        a += sin(array_in * _) / _ * ((32 - _) / 31)
+    return maximize(a) # lp_saw
+
+def strings(array_in) -> np.array:
+    sawtooth_arr  = lp_saw((array_in + np.random.rand() * 100) * 1.02) * 0.2
+    sawtooth_arr += lp_saw((array_in + np.random.rand() * 100) * 1.01) * 0.2
+    sawtooth_arr += lp_saw((array_in + np.random.rand() * 100) * 1.00) * 0.2
+    sawtooth_arr += lp_saw((array_in + np.random.rand() * 100) * 0.99) * 0.2
+    sawtooth_arr += lp_saw((array_in + np.random.rand() * 100) * 0.98) * 0.2
+    sawtooth_arr /= max(abs(sawtooth_arr))
+    arr = sawtooth_arr * slide(0, 1, len(array_in), 8000) * slide(0, 1, len(array_in), 3000)[::-1]
+    return maximize(arr) # strings
+
 def unison_saw(array_in) -> np.array:
-    sawtooth_arr  = sawtooth((array_in + np.random.rand() * 100) * 1.04) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.02) * 0.2
+    sawtooth_arr  = sawtooth((array_in + np.random.rand() * 100) * 1.02) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.01) * 0.2
     sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 1.00) * 0.2
+    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.99) * 0.2
     sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.98) * 0.2
-    sawtooth_arr += sawtooth((array_in + np.random.rand() * 100) * 0.96) * 0.2
     sawtooth_arr /= max(abs(sawtooth_arr))
     arr = sawtooth_arr * slide(1, 0.8, len(array_in), 2000)
-    return arr # unison_saw
+    return maximize(arr) # unison_saw
 
 def lead_saw1(arr):
     n = fnoise(arr * 5)
@@ -109,7 +128,12 @@ def hardlead(arr):
     arr[-round(60 / bpm / 16 * rate):] *= 0
     s = lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2
     arr *= 2
+    s += lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2
+    arr *= 2
     s += (lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2) * 0.8
+    arr /= 8
+    s += (lead_saw1(arr) * 0.2 + lead_saw2(arr) * 0.6 + lead_pulse1(arr) * 0.2) * 0.8
+    s = maximize(s)
     s = distortion(s, 0.4, 0.6)
     s = highpass(s, 300)
     s = highgain(s, 1500, 1.3)
@@ -121,7 +145,12 @@ def hardchord(arr):
     arr[-round(60 / bpm / 16 * rate):] *= 0
     s = unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25
     arr *= 2
+    s += unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25
+    arr *= 2
     s += (unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25) * 0.8
+    arr /= 8
+    s += (unison_saw(arr) * 0.2 + lead_pulse1(arr) * 0.3 + lead_saw1(arr) * 0.25 + lead_saw2(arr) * 0.25) * 0.8
+    s = maximize(s)
     s = distortion(s, 0.5, 0.55)
     s = highpass(s, 300)
     s = bandgain(s, 2000, 1000, 1.3)
@@ -365,22 +394,23 @@ def compile_tracks(tracks, volumes, effects, master):
     return song # compile_tracks
 
 def maximize(arr):
-    arr = arr - (max(arr) + min(arr)) / 2
     arr /= max(abs(arr))
     return arr # maximize
 
 audio = audio = AudioFileClip("IR.wav")
-n = audio.to_soundarray().T[0] # IR
+n = audio.to_soundarray().T[1] # IR
 
-def reverb(x, dry=0.8):
-    x1 = deepcopy(x)
-    n[-1] = 0
-    print("convolving")
-    x = np.convolve(x, n)[:len(x1)]
-    x = maximize(x)
-    print("finish")
-    x = x1 * dry + x * (1 - dry)
-    return x # reverb
+def reverb(x, dry=0.6):
+    if not no_reverb:
+        x1 = deepcopy(x)
+        n[-1] = 0
+        print("convolving")
+        x = np.convolve(x, n)[:len(x1)]
+        x = maximize(x)
+        print("finish")
+        x = x1 * dry + x * (1 - dry)
+        return x # reverb
+    return x
 
 def distortion(a, x, y):
     for i in range(len(a)):
@@ -401,7 +431,7 @@ def kickstart(x):
     s += 1
     s *= 2
     s = limit(s, 1, 0)
-    s = distortion(s, 0.8, 0.2)
+    s = distortion(s, 0.7, 0.3)
     x *= s
     return x # kickstart
     
@@ -427,14 +457,23 @@ def compressor(x):
             if a > 1:
                 a *= 0.998
         x[i] /= a
-    x = maximize(x)
+        
     print("finish")
-    return x # compressor
+    return maximize(x) # compressor
+
+def declick(x):
+    for i in range(len(x)):
+        if len(x) - 2 > i > 0:
+            #if abs(x[i]) >= 0.6 and abs(x[i - 1]) <= 1e-2 and abs(x[i - 1]) <= 1e-2:
+            if abs(x[i - 1] - x[i + 1]) < 1e-1 and abs(x[i - 1] - x[i]) > 0.6:
+                x[i] = x[i - 1] # de-clicking
+                print("Click!")
+    return x # declick
 
 def times(x, t):
     return x * t # times
 
-
+"""
 climax = compile_tracks(
     [
         [
@@ -510,6 +549,8 @@ climax = compile_tracks(
             build_melody(note("B5"), 60 / bpm / 2, hardlead, 0),
             build_melody(note("B5"), 60 / bpm / 2, hardlead),
             build_melody(note("A5"), 60 / bpm / 2, hardlead),
+            
+            build_melody(0, 60 / bpm * 32, volume=0)
 
         ],
         [
@@ -585,6 +626,8 @@ climax = compile_tracks(
             build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord, 0),
             build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
             build_chord([note("A4"), note("C#5"), note("E5")], 60 / bpm / 2, hardchord),
+            
+            build_melody(0, 60 / bpm * 32, volume=0)
         ],
         [
             build_melody(0, 60 / bpm / 2, sin, 0),
@@ -666,99 +709,98 @@ climax = compile_tracks(
             raw_tail(note("A2"), 60 / bpm / 4),
             raw_kick2(note("C2")),
             raw_kick2(note("C2")),
+            
+            build_melody(0, 60 / bpm * 32, volume=0)
 
         ]
     ],
-    [0.4, 0.6, 0.4], # 精细（？）音量
+    [0.3, 0.5, 0.2], # 精细（？）音量
     #[0, 0, 1], # only kicks
-    [eff_chain(reverb, eff(times, 20), compressor, kickstart), eff_chain(reverb, eff(times, 20), compressor, kickstart), eff_chain(eff(reverb, dry=0.9), compressor)], # 细致（雾🌫️）混音
-    #[eff_chain(eff(times, 20), compressor, kickstart), eff_chain(eff(times, 20), compressor, kickstart), eff_chain(eff(times, 1.5), compressor)], # 快速预览
-    eff_chain(maximize, eff(times, 2.5), compressor) # 极简母带（压成砖头）
+    [eff_chain(maximize, eff(times, 40), compressor, declick, reverb, eff(highpass, note("G3")), maximize, kickstart), eff_chain(maximize, eff(times, 40), compressor, declick, reverb, eff(highpass, note("G3")), maximize, kickstart), eff_chain(maximize, eff(reverb, dry=0.9), eff(highpass, note("G1")), maximize)], # 细致（雾🌫️）混音
+    #[eff_chain(maximize, eff(times, 40), eff(highpass, note("G3")), compressor, kickstart), eff_chain(maximize, eff(times, 20), compressor, eff(highpass, note("G3")), kickstart), eff_chain(maximize, compressor)], # 快速预览
+    eff_chain(maximize, eff(highpass, note("G1")), eff(times, 3), compressor) # 极简母带（压成砖头）
     )
+song = climax
+"""
 """
 climax = compile_tracks(
-[      
-[
-            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+    [
+        [
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
             build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
             build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
             
-            build_melody(note("F#5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A#5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("A#5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm, unison_saw_pluck),
+            
+            build_melody(note("D6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
             
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
-            
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm, unison_saw_pluck),
             build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("F#6"), 60 / bpm / 2, unison_saw_pluck),
 
             
-            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
             build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("G4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
             build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
             
-            build_melody(note("F#5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A#5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("F#5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("A#5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm, unison_saw_pluck),
+            
+            build_melody(note("D6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
             build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#4"), 60 / bpm / 2, unison_saw_pluck),
-            
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("B4"), 60 / bpm / 2, unison_saw_pluck),
             
             build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("A4"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("C#6"), 60 / bpm / 2, unison_saw_pluck),
-            build_melody(note("F#6"), 60 / bpm / 2, unison_saw_pluck),
-]
-],
-[1],
-[lambda x:x],
-lambda X:X
+            build_melody(note("D6"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("C#6"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm, unison_saw_pluck),
+            build_melody(note("B5"), 60 / bpm / 2, unison_saw_pluck),
+            build_melody(note("A5"), 60 / bpm / 2, unison_saw_pluck),
+        ]
+    ],
+    [1],
+    [eff_chain(reverb, compressor),],
+    lambda X:X
 )
-"""
 song = climax
+"""
+climax = compile_tracks(
+    [
+        [
+            build_chord([note("G4"), note("B4"), note("D4")], 60 / bpm * 4, strings),
+            build_chord([note("F#4"), note("A#4"), note("D4")], 60 / bpm * 4, strings),
+            build_chord([note("B4"), note("D4"), note("F#4")], 60 / bpm * 4, strings),
+            build_chord([note("A4"), note("C#4"), note("E4")], 60 / bpm * 4, strings),
+        ]
+    ],
+    [1],
+    [lambda X:X,],
+    lambda X:X
+)
+song = climax
+
+
 song = (song * 32767).astype(np.int16)
 #              ^^^^^ 淦，之前写的都是1024
 plt.plot(song)
