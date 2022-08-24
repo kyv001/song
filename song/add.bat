@@ -1,0 +1,1 @@
+ffmpeg -i L.wav -i R.wav -filter_complex "[0:a][1:a]amerge=inputs=2[aout]" -map "[aout]" song.wav
