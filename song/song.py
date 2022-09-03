@@ -305,6 +305,18 @@ def bass_808(freq, duration):
     m *= slide(1, 0, round(duration * rate * t), 10000)
     return m[::t] # bass_808
 
+def FM_growl(freq, duration, x, y, nosub=False):
+    sub = build_melody(freq, duration, sin) * x
+    f = build_melody(freq, duration, lambda x:x)
+    osc12 = triangle(f * 12) * x * 1.5
+    osc16 = square(f * 16 + sub * 4) * y
+    osc2 = triangle(f * 2 + osc12 + osc16) * x
+    osc3 = triangle(f * 3 - osc12 + osc16) * x
+    if nosub:
+        sub *= 0
+    return distortion(maximize(maximize(osc2 + osc3) + sub), 0.4, 0.6)
+
+
 def hihat(duration):
     n = build_melody(1, duration, noise)
     n = highpass(n, 2000)
@@ -574,35 +586,164 @@ def declick(x):
 def times(x, t):
     return x * t # times
 
-kickroll1 = np.append(np.append(np.append(raw_kick2(note("F2")), raw_kick2(note("E2"))), raw_kick2(note("A1"))), raw_tail(note("C2"), 60 / bpm / 4))
-full_kick2 = np.append(raw_kick2(note("C2")), raw_tail(note("C2"), 60 / bpm / 4 * 3))
-
 outro = compile_tracks(
     [
         [
-            full_kick2,
-            full_kick2,
-            full_kick2,
-            kickroll1,
-            
-            full_kick2,
-            full_kick2,
-            full_kick2,
-            full_kick2,
+            FM_growl(note("C2"), 60 / bpm * 1, abs(build_melody(5, 60 / bpm * 1, sin)), abs(build_melody(2, 60 / bpm * 1, sin)), True),
+            FM_growl(note("C2"), 60 / bpm * 2, abs(build_melody(2.5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            FM_growl(note("C2"), 60 / bpm * 1, abs(build_melody(5, 60 / bpm * 1, sin)), abs(build_melody(2, 60 / bpm * 1, sin)), True),
 
-            full_kick2,
-            full_kick2,
-            full_kick2,
-            scratch(kickroll1, build_melody(10, 60 / bpm, np.sin, 100)),
+            build_melody(0, 60 / bpm * 4, sin, 0),
             
-            full_kick2,
-            full_kick2,
-            full_kick2,
-            full_kick2,
+            FM_growl(note("D2"), 60 / bpm * 1, abs(build_melody(5, 60 / bpm * 1, sin)), abs(build_melody(5, 60 / bpm * 1, sin)), True),
+            FM_growl(note("C2"), 60 / bpm * 1, abs(build_melody(5, 60 / bpm * 1, sin)), abs(build_melody(5, 60 / bpm * 1, sin)), True),
+            FM_growl(note("C2"), 60 / bpm * 2, abs(build_melody(2.5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            
+            build_melody(0, 60 / bpm * 4, sin, 0),
+            
+            
+            build_melody(0, 60 / bpm * 4, sin, 0),
+
+            FM_growl(note("C2"), 60 / bpm * 2, abs(build_melody(5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            FM_growl(note("C3"), 60 / bpm * 2, abs(build_melody(2.5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            
+            build_melody(0, 60 / bpm * 4, sin, 0),
+
+            FM_growl(note("F2"), 60 / bpm * 2, abs(build_melody(5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            FM_growl(note("C2"), 60 / bpm * 2, abs(build_melody(2.5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            
+            build_melody(0, 60 / bpm * 4, sin, 0),
+
+            FM_growl(note("C2"), 60 / bpm * 2, abs(build_melody(5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            FM_growl(note("A1"), 60 / bpm * 2, abs(build_melody(2.5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            
+            build_melody(0, 60 / bpm * 4, sin, 0),
+
+            FM_growl(note("D2"), 60 / bpm * 2, abs(build_melody(5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+            FM_growl(note("D2"), 60 / bpm * 2, abs(build_melody(2.5, 60 / bpm * 2, sin)), abs(build_melody(5, 60 / bpm * 2, sin)), True),
+        ],
+        [
+            raw_kick2(100),
+            raw_tail(note("C2"), 60 / bpm / 4 * 7),
+            raw_kick2(100),
+            raw_tail(note("C2"), 60 / bpm / 4 * 7),
+
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            
+            raw_kick2(100),
+            raw_tail(note("C2"), 60 / bpm / 4 * 7),
+            raw_kick2(100),
+            raw_tail(note("C2"), 60 / bpm / 4 * 7),
+
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick2(100),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            raw_kick2(100),
+            raw_kick2(110),
+            raw_kick2(120),
+            raw_kick2(130),
+            raw_kick2(140),
+            raw_kick2(150),
+
+
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_kick(100),
+            raw_kick(100),
+            raw_kick(100),
+
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 2),
+            raw_kick(300),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            
+
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            raw_kick3(120),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 2),
+            raw_kick3(150),
+            raw_kick3(120),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(120),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
+            raw_kick3(100),
+            raw_tail2(note("C2"), 60 / bpm / 4 * 3),
         ]
     ],
-    [1],
-    [lambda x:x],
+    [1.5, 1],
+    [kickstart, lambda x:x],
     limiter
 )
 song = outro
