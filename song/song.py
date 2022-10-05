@@ -508,7 +508,7 @@ def maximize(arr):
     return arr # maximize
 
 audio = audio = AudioFileClip("IR.wav")
-n = audio.to_soundarray().T[0] # IR
+n = audio.to_soundarray().T[0 if side else 1] # IR
 
 def reverb(x, dry=0.5):
     if not no_reverb:
