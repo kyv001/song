@@ -1,5 +1,6 @@
 from copy import deepcopy
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 import os
 from random import randint
@@ -647,7 +648,7 @@ def reverb(x, dry=0.7):
             x1 = deepcopy(x)
             n[-1] = 0
             print("convolving")
-            x = np.convolve(x, n)[:len(x1)]
+            x = scipy.signal.fftconvolve(x, n)[:len(x1)]
             x = maximize(x)
             print("finish")
             x = x1 * dry + x * (1 - dry)
