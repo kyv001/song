@@ -7,15 +7,12 @@
 > **给后来的 agent**
 >
 > **这是个 playground。** 整个仓库没有任何生产用途，唯一的目标是把曲子写得更好听。
-> 引擎、音色、效果、依赖、文件结构——**全都可以改**：删掉不用的函数、
-> 把单文件拆成模块、换掉整个合成器架构、上 numba 把那些逐采样循环干掉，
-> 都随便。不用管向后兼容、不用管可维护性、不用管别人的代码风格，
-> 也不用为了「尊重原作者」而绕路（原作者就是当年写它的那个小孩，他只会高兴）。
-> 改坏了 `git checkout` 就回来了。
+> 引擎、音色、效果、依赖、文件结构**全都可以改**：删掉不用的函数、拆成模块、
+> 换掉合成器架构、上 numba 干掉那些逐采样循环，都随便。不用管向后兼容、
+> 可维护性和代码风格，也不用怕改坏——`git checkout` 就回来了。
 >
-> 所以下面这份文档的定位是**地图**——「哪里有什么、哪里会塌」，
-> 不是「什么不许动」。尤其 **「一、会咬人的地方」**：那是当前实现的真实行为
-> （我自己踩过的坑），不是设计规范。想改掉它们完全可以，只要知道改了会发生什么。
+> 下面这份文档是**地图**（哪里有什么、哪里会塌），不是「什么不许动」。
+> 尤其 **「一、会咬人的地方」**：那是当前实现的行为，不是设计规范。
 >
 > - 想换一首曲子 → 整个编曲层（`compile_section` 那段）删掉重写
 > - 想加音色 → 写个 `相位 -> 波形` 的函数传给 `build_note`
@@ -57,57 +54,46 @@ python plot.py            # 出 tide.png（波形 / 频谱 / 高潮放大）
 
 ## 一、会咬人的地方
 
-下面每一条都是**当前代码的真实行为**，不是纪律。写了「必须」「别」的地方，
-意思都是「这样做了会炸 / 会难听」，而不是「作者不同意」。想绕开、想重构、想改掉，
-都行——知道代价就好。每一条都标了炸的方式，方便你决定值不值得修。
+下面每一条都是当前代码的真实行为，不是纪律——每条都写了违反之后会怎么炸。
 
 1. **一段里所有轨必须等长。** `compile_tracks` 用 `song += track` 累加，长度不一致
    直接 broadcast 报错。用 `mk_track(items, bars)` 把每条轨补齐/截断到
    `round(bars * bar * rate)`，别手工数。
 
-2. ~~**FFT 滤波必须放在 `reverb` 之前。**~~ —— **这条已经作废了。**
-   它曾经成立：`highpass/lowpass/…` 返回的是复数数组，一旦喂给它们 `reverb` 的
-   输出，信息就落在虚部、再被 `astype(np.float16)` 丢掉。现在滤波器出口都取
-   `.real`，两种顺序实测完全等价（峰值都是 0.724），随便排。
-   原作者的链条仍是「先滤波 → 混响 → 增益/limiter」，照着写不会错，但不再是硬性要求。
-   （这也是本仓库的典型情况：**文档里的「必须」往往是某个 bug 的影子，把 bug 修掉
-   「必须」就没了**，别把它当祖训。）
-
-3. **`compile_tracks` 从列表尾部取基准轨**（`tracks_l.pop()` / `volumes.pop()` /
+2. **`compile_tracks` 从列表尾部取基准轨**（`tracks_l.pop()` / `volumes.pop()` /
    `effects.pop()`），所以 `tracks`、`volumes`、`effects` 三个列表必须严格平行、
    长度一致。
 
-4. **`master` 之后有一道自动保险**：`if max(abs(song)) > 1: song = limiter(song)`，
+3. **`master` 之后有一道自动保险**：`if max(abs(song)) > 1: song = limiter(song)`，
    而 `limiter` 结尾会 `maximize`，也就是把整段顶到峰值 1.0。想让段落保持你指定的
    电平，就让 master 输出的峰值 **小于 1**。
 
-5. **`maximize(arr)` 是原地修改**（`arr /= max(abs(arr))`），会改掉传进去的数组。
+4. **`maximize(arr)` 是原地修改**（`arr /= max(abs(arr))`），会改掉传进去的数组。
    别把同一个数组同时交给两个地方。
 
-6. **`bpm` 是所有时值的基准**，且 `kick` / `psy_punch` / `psy_tail` 的长度都等于
-   一个十六分音符。改 `bpm` 不用改别处（`short_noise` 已经跟着走了），但把
-   `bpm` 改回 150 以上之外的值时要留意 `long_noise` 够不够长。
+5. **`bpm` 是所有时值的基准。** `kick` / `psy_punch` / `psy_tail` 的长度都等于一个
+   十六分音符，`short_noise` 也按 `round(60 / bpm / 4 * rate)` 取，改 bpm 只改
+   这一个变量。
 
-7. **`empty()` 返回的是 int64 全零**（`build_note` 里 `volume == 0` 走的是提前返回
+6. **`empty()` 返回的是 int64 全零**（`build_note` 里 `volume == 0` 走的是提前返回
    分支），不是 float。拼接时 numpy 会自动提升，但别依赖它的 dtype。
 
-8. **这些函数是逐采样的 Python 循环**：`sawtooth`、`square`、`triangle`、
+7. **这些函数是逐采样的 Python 循环**：`sawtooth`、`square`、`triangle`、
    `distortion`、`limiter`、`slide`、`scratch`、`declick`。给整段（几百万采样）
    套一个 `slide` 会卡到怀疑人生——包络请用 numpy 写（见 `swell()`）。
 
-9. **`reverb` 会把湿信号单独 `maximize` 到峰值 1.0**，再按 `(1 - dry)` 混进来。
+8. **`reverb` 会把湿信号单独 `maximize` 到峰值 1.0**，再按 `(1 - dry)` 混进来。
    也就是说不管输入多轻，混响的水位是固定的：安静的音色（琶音、分解和弦）
    会被混响淹掉。这类轨用 `dry=0.9` 左右，或者干脆不过混响。
 
-10. **`build_note` 的相位是 `linspace(0, freq*2π*duration, length)`。** 如果
+9. **`build_note` 的相位是 `linspace(0, freq*2π*duration, length)`。** 如果
     `freq × duration` 不是整数，音符首尾对不上，会产生咔哒声——长音尤其明显。
     引擎里的 `declick()` 就是为了擦这个，但它本身也很慢。
 
-11. **引擎自带的 `hihat()` 基本没声音**（实测峰值 0.046），`crash()` 衰减又太快
-    （0.2 秒就没了）。编曲层的 `hat()` / `crash_wash()` 是替代品，用那两个最省事；
-    想把引擎里那两个直接改好当然更彻底。
+10. **引擎自带的 `hihat()` 基本没声音**（峰值 0.046），`crash()` 0.2 秒就衰减完。
+    编曲层的 `hat()` / `crash_wash()` 是替代品。
 
-12. `_er()` 里递归调用的是 `_reverb`（疑似笔误），只有 `no_convolve=True` 才会走到；
+11. `_er()` 里递归调用的是 `_reverb`（疑似笔误），只有 `no_convolve=True` 才会走到；
     `fnoise()`、`scratch()`、`comb_filter()` 目前没人用。
 
 ---
@@ -176,10 +162,10 @@ sin(x) + sin(x * 2)    # 叠一个八度
 
 ### 3. 轨
 
-一串首尾相接的波形数组。`mk_track(items, bars)` 负责拼成整段长度
-（不足补零、超出截断）——**并且它顺便把 `np.append` 的 O(n²) 干掉了**：
-先在 `mk_track` 里 `np.concatenate` 拼好，再以 `[[t] for t in tracks]` 的形式
-交给 `compile_tracks`，每条轨只 append 一次。
+一串首尾相接的波形数组。`mk_track(items, bars)` 负责拼成整段长度（不足补零、
+超出截断），并且用 `np.concatenate` 一次拼好；再以 `[[t] for t in tracks]` 的
+形式交给 `compile_tracks`，每条轨只会被 append 一次，避开逐音符 `np.append`
+的 O(n²)。
 
 ### 4. 段
 
@@ -188,7 +174,7 @@ compile_section(name, bars, tracks, volumes, effects, level)
 ```
 
 若干条等长轨 → 各过效果链 → 乘音量 → 相加 → master（压限 + 归一）→ **再按 RMS
-定到 `level`**。最后那一步是《潮汐》加的，见「六、混音」。
+定到 `level`**。最后那一步见「六、混音」。
 
 ---
 
@@ -222,6 +208,9 @@ compile_section(name, bars, tracks, volumes, effects, level)
    另外所有滤波器出口都带 `if max(abs(arr)) > 1: maximize(arr)`，
    所以 `times` 很大的调用（kick 里用到 300）实际是「窄带提取 + 归一到峰值 1」，
    而不是简单放大。
+
+   自己写 FFT 类效果时记得出口取 `.real`：`ifft` 回来的是复数，直接往后传会在
+   转 float32 时报 `ComplexWarning`，拼轨时也会因为复数没法累加而报错。
 
 4. **失真（波形整形）** — `distortion(a, x, y)` 把 `[0, x]` 映到 `[0, y]`、
    `[x, 1]` 映到 `[y, 1]`，负半轴对称。**`x` 越小越脏**：
@@ -429,7 +418,7 @@ song = np.concatenate([rise, surge, theme, ebb, climax, afterglow])
 
 1. 用第四节那张实测表，反推每条轨的音量：`音量 = 想要的 RMS / 实测 RMS`。
 2. 段落强弱用 **RMS** 而不是峰值来定。同样的峰值下，密集段落听起来响得多——
-   《潮汐》第一版每段都顶到峰值，结果高潮的波峰因数只有 7.6 dB，一首糊墙。
+   只按峰值对齐的话，高潮会糊成一堵墙（波峰因数掉到 8 dB 以下）。
 3. 峰值留给最后统一归一化，段间比例不会被破坏。
 
 ```python
@@ -478,12 +467,11 @@ python plot.py            # tide.png + 指标
 
 改完编曲记得**两个声道都重渲**，否则 `merge.py` 会把新旧两版拼在一起。
 
-**渲染不是确定性的。** `noise()` 返回的当然是随机数，`reese()` / `strings()`
-还会用 `np.random.rand()` 给每一路失谐抽一个相位偏移；所以同一份代码重渲，
-波形和峰值都会有差异（实测同一段峰值 0.288 vs 0.339）。段落 RMS 基本一致，
-因为段落是按 RMS 定级的，但**别拿峰值/波形图去比对两次渲染**。
-想让某一次结果可复现，得自己在开头固定随机种子——目前没做这件事，
-所以仓库里那张 `tide.png` 和任何一次本地渲染都不会逐采样相同。
+**渲染不是确定性的。** `noise()` 返回随机数，`reese()` / `strings()` 还会用
+`np.random.rand()` 给每一路失谐抽相位偏移，所以同一份代码重渲，波形和峰值都
+不一样（段落 RMS 基本一致，因为按 RMS 定级）。**别拿峰值或波形图去比对两次
+渲染。** 想复现得自己在开头固定随机种子，目前没做——仓库里那张 `tide.png`
+也只是一次取样的结果。
 
 环境备注：仓库里的 `.venv` 在某些沙箱里 `uv run` 会因为缓存目录只读而失败，
 可以直接用解释器加 `PYTHONPATH`：
@@ -501,11 +489,11 @@ PYTHONPATH=.venv/lib/python3.13/site-packages \
 |---|---|---|
 | `Cannot cast ufunc 'add' output from complex128 to float64` | 某个 FFT 滤波器返回了复数数组 | 滤波器出口要取 `.real`；拼轨时用 `np.real()` 兜底 |
 | `operands could not be broadcast together` | 同一段里轨长不一致 | 全部过 `mk_track(items, bars)` |
-| `kick` 里 `short_noise * slide(...)` 长度不匹配 | `bpm` 不是 `short_noise` 当初对应的速度 | `short_noise` 必须取 `round(60/bpm/4*rate)` |
+| `short_noise` 与 `slide(...)` 长度不匹配 | `bpm` 改了，`short_noise` 没跟着 | `short_noise` 取 `round(60/bpm/4*rate)` |
 | 某段整体声音很小 | master 输出的峰值 < 1，没触发自动归一化，段间比例被拉开 | 这是**故意的**；要改就改 `level` |
 | 某段突然变响且变糊 | master 输出峰值 > 1，触发了自动 `limiter`（归一化到 1.0） | 让 master 输出峰值 < 1，或自己写 master |
 | 全是 `nan` | 对一个全零数组调了 `maximize`（除零） | 别给空轨 / 静音轨套 `maximize`、`reverb` |
-| 安静段落有底噪 | 混音中间用了 float16（11 位尾数） | 改成 float32；改回 float16 就会重新有底噪 |
+| 安静段落有底噪 | 混音路径用了 float16（11 位尾数） | 保持 float32 |
 | 长音首尾有咔哒声 | 相位不整周期 | 用 `declick()`，或让 `freq × duration` 取整 |
 | 混响把安静音色淹了 | `reverb` 会把湿信号归一化到峰值 1.0 | 提高 `dry`（0.9+）或不过混响 |
 | 渲染慢得离谱 | 整段套了 `slide` / `distortion` / `limiter` | 包络改 numpy；逐采样效果只用在音符上 |
@@ -533,15 +521,14 @@ PYTHONPATH=.venv/lib/python3.13/site-packages \
 
 主题 A / B 是 E 自然小调上的八小节乐句，和声线由 `third_below()` 生成。
 成品：`song/song.wav`（立体声，峰值 0.980，波峰因数 16.3 dB，削顶 0）。
-更早那首收在 git 历史里：`git show 8f4d3de:song/song.py`
-（`Create LICENSE` 那个提交，也就是《潮汐》之前的一版）。
+上一版（原曲）在 git 历史里：`git show 8f4d3de:song/song.py`。
 
 ### 配套工具
 
 | 文件 | 作用 |
 |---|---|
 | [`song/song.py`](song/song.py) | 引擎 + 编曲，唯一需要懂的文件 |
-| [`song/merge.py`](song/merge.py) | 把 L.wav / R.wav 交叉成 `song.wav`（跨平台，替代 `add.bat`） |
+| [`song/merge.py`](song/merge.py) | 把 L.wav / R.wav 交叉成 `song.wav`，只用标准库 |
 | [`song/plot.py`](song/plot.py) | 波形 / 频谱 / 高潮放大 + 客观指标 |
-| [`song/add.bat`](song/add.bat) | Windows 上的 ffmpeg 合并（保留给老环境） |
+| [`song/add.bat`](song/add.bat) | 同样的事，走 ffmpeg，Windows 用 |
 | [`song/tide.png`](song/tide.png) | 《潮汐》的分析图 |
