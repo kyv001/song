@@ -526,7 +526,8 @@ PYTHONPATH=.venv/lib/python3.13/site-packages \
 
 主题 A / B 是 E 自然小调上的八小节乐句，和声线由 `third_below()` 生成。
 成品：`song/song.wav`（立体声，峰值 0.980，波峰因数 16.3 dB，削顶 0）。
-更早那首收在 git 历史里：`git show HEAD:song/song.py`。
+更早那首收在 git 历史里：`git show 8f4d3de:song/song.py`
+（`Create LICENSE` 那个提交，也就是《潮汐》之前的一版）。
 
 ### 配套工具
 
