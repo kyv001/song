@@ -11,6 +11,8 @@ dependencies = [
     "matplotlib>=3.11.2",
     "moviepy>=2.2.1",
     "numpy>=2.5.3",
+    "opencv-python-headless>=5.0.0.93",
+    "pygame>=2.6.1",
     "scipy>=1.18.1",
 ]
 

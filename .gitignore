@@ -365,3 +365,11 @@ FodyWeavers.xsd
 /song/L.wav
 /song/song.wav
 /song/preview.wav
+
+# 《余烬》的派生大文件：分轨和可视化视频都是可重生成的（python stems.py /
+# python visualize.py），整首约 580 MB，不适合进 git。
+# 想提交就删掉下面四行。
+/song/stems/
+/song/_vis_tmp/
+/song/_vid_silent.mp4
+/song/embers_visual.mp4
