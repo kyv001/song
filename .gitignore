@@ -363,3 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 /song/R.wav
 /song/L.wav
+/song/song.wav
+/song/preview.wav
